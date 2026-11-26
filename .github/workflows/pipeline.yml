@@ -1,0 +1,260 @@
+name: CI/CD - Panaderia Pan de la Casa
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  AZURE_RESOURCE_GROUP: panaderia-rg
+  AZURE_FUNCTION_APP_NAME: panaderia-api
+  AZURE_STATIC_WEB_APP_NAME: panaderia-frontend
+
+jobs:
+  # ------------------------------------------------------------------
+  # Etapa 1: Analisis y Seguridad (Bonus +2 pts: CodeQL + Checkov)
+  # ------------------------------------------------------------------
+  security:
+    name: Analisis y Seguridad (CodeQL + Checkov)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Autobuild CodeQL
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Ejecutar analisis de seguridad CodeQL
+        uses: github/codeql-action/analyze@v3
+
+      - name: Ejecutar Checkov (IaC / configuraciones en la nube)
+        run: |
+          python -m pip install --user checkov
+          checkov --directory . --framework all --compact
+
+  # ------------------------------------------------------------------
+  # Etapa 2: Build
+  # ------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias del backend
+        working-directory: src/backend
+        run: npm install
+
+      - name: Instalar dependencias del frontend
+        working-directory: src/frontend
+        run: npm install
+
+      - name: Build del frontend
+        working-directory: src/frontend
+        run: npm run build
+
+      - name: Subir artefacto frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: src/frontend/dist
+          retention-days: 7
+
+      - name: Subir artefacto backend
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-src
+          path: src/backend
+          retention-days: 7
+
+  # ------------------------------------------------------------------
+  # Etapa 3: Pruebas automatizadas (Bloquean el despliegue si fallan)
+  # ------------------------------------------------------------------
+  test:
+    name: Pruebas automatizadas
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias del backend
+        working-directory: src/backend
+        run: npm install
+
+      - name: Ejecutar pruebas unitarias (vitest)
+        working-directory: src/backend
+        run: npm test
+
+  # ------------------------------------------------------------------
+  # Etapa 4: Deploy (Dev -> Produccion) sobre Azure (Static Web Apps + Functions)
+  # ------------------------------------------------------------------
+  deploy-dev:
+    name: Deploy a Dev (Azure)
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+    environment: dev
+    outputs:
+      swa_url: ${{ steps.hostname.outputs.url }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Descargar artefacto frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Descargar artefacto backend
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-src
+          path: backend
+
+      - name: Login a Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SERVICE_CREDENTIAL }}
+
+      - name: Package and deploy backend (Azure Functions)
+        run: |
+          cd backend
+          npm install --omit=dev
+          zip -r ../function.zip . -x ".*" -x ".*node_modules/.cache*"
+          az functionapp deployment source config-zip \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_FUNCTION_APP_NAME }} \
+            --src ../function.zip
+
+      - name: Deploy frontend a Azure Static Web Apps
+        id: swa
+        uses: azure/static-web-apps-deploy@v1
+        with:
+          app_location: "src/frontend"
+          api_location: "src/backend"
+          package_location: "src/frontend"
+          token: ${{ secrets.AZURE_STATIC_WEB_APP_TOKEN }}
+
+      - name: Get Static Web App hostname
+        id: hostname
+        run: echo "url=https://${{ steps.swa.outputs.staticWebAppDefaultHostname }}" >> $GITHUB_OUTPUT
+
+  deploy-prod:
+    name: Deploy a Produccion (Azure)
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+    environment: production
+    outputs:
+      swa_url: ${{ steps.hostname.outputs.url }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Descargar artefacto frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Descargar artefacto backend
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-src
+          path: backend
+
+      - name: Login a Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SERVICE_CREDENTIAL }}
+
+      - name: Package and deploy backend (Azure Functions)
+        run: |
+          cd backend
+          npm install --omit=dev
+          zip -r ../function.zip . -x ".*" -x ".*node_modules/.cache*"
+          az functionapp deployment source config-zip \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_FUNCTION_APP_NAME }} \
+            --src ../function.zip
+
+      - name: Deploy frontend a Azure Static Web Apps
+        id: swa
+        uses: azure/static-web-apps-deploy@v1
+        with:
+          app_location: "src/frontend"
+          api_location: "src/backend"
+          package_location: "src/frontend"
+          token: ${{ secrets.AZURE_STATIC_WEB_APP_TOKEN }}
+
+      - name: Get Static Web App hostname
+        id: hostname
+        run: echo "url=https://${{ steps.swa.outputs.staticWebAppDefaultHostname }}" >> $GITHUB_OUTPUT
+
+  # ------------------------------------------------------------------
+  # Etapa 5: Smoke Tests contra la URL desplegada
+  # ------------------------------------------------------------------
+  smoke:
+    name: Smoke Tests (Post-deploy)
+    runs-on: ubuntu-latest
+    needs: deploy-prod
+    if: >-
+      github.event_name == 'push' &&
+      github.event.ref == 'refs/heads/main' &&
+      needs.deploy-prod.result == 'success'
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Ejecutar smoke test contra la API desplegada
+        run: node tests/smoke/smoke.js
+        env:
+          BASE_URL: ${{ needs.deploy-prod.outputs.swa_url }}
