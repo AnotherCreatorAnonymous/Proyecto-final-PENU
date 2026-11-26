@@ -1,32 +1,34 @@
-const products = [
+const { getDb } = require('./db');
+
+const initialProducts = [
   {
     id: 'croissant-almendras',
     name: 'Croissant Almendras',
     description: 'Croissant hojaldrado con almendras.',
     price: 6500,
     emoji: '🥐',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/croissant-almendras.webp',
+    imageUrl: 'https://stpandelacasa.blob.core.windows.net/catalogo-img/croissant.jpg',
     category: 'panes',
     active: true,
   },
   {
     id: 'pan-de-bono',
-    name: 'Pan de Bonito',
-    description: 'Pan artesanal horneado a mano con masa madre.',
+    name: 'Pan de Bono',
+    description: 'Pan artesanal horneado a mano con queso campesino.',
     price: 1500,
     emoji: '🍞',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/pan-de-bono.webp',
+    imageUrl: 'https://stpandelacasa.blob.core.windows.net/catalogo-img/pan_de_bono.jpg',
     category: 'panes',
     active: true,
   },
   {
     id: 'pandes-de-yuca',
-    name: 'Pandes de Yuca',
-    description: 'Crujientes por fuera y suaves por dentro con chicharrón.',
+    name: 'Pan de Yuca',
+    description: 'Crujiente por fuera y suave por dentro.',
     price: 2000,
     emoji: '🥟',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/pandes-de-yuca.webp',
-    category: 'pandes',
+    imageUrl: 'https://stpandelacasa.blob.core.windows.net/catalogo-img/pan_de_yuca.jpg',
+    category: 'panes',
     active: true,
   },
   {
@@ -35,165 +37,108 @@ const products = [
     description: 'Pan dulce con trozos de chocolate amargo.',
     price: 3200,
     emoji: '🍫',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/pan-de-chocolate.webp',
+    imageUrl: 'https://stpandelacasa.blob.core.windows.net/catalogo-img/pan_de_chocolate.jpg',
     category: 'panes',
-    active: true,
-  },
-  {
-    id: 'rebanadas-de-queso',
-    name: 'Rebanadas de Queso',
-    description: 'Rebanadas de pan de yema con queso campesino.',
-    price: 1800,
-    emoji: '🧀',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/rebanadas-de-queso.webp',
-    category: 'rebanadas',
-    active: true,
-  },
-  {
-    id: 'galletas-de-chispa',
-    name: 'Galletas de Chispa',
-    description: 'Galletas caseras con chispa de vainilla.',
-    price: 1200,
-    emoji: '🍪',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/galletas-de-chispa.webp',
-    category: 'dulces',
-    active: true,
-  },
-  {
-    id: 'churros-canela',
-    name: 'Churros con Canela',
-    description: 'Churros fritos con azúcar y canela.',
-    price: 2200,
-    emoji: '🥨',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/churros-canela.webp',
-    category: 'dulces',
     active: true,
   },
   {
     id: 'almojabanas',
     name: 'Almojábanas',
-    description: 'Almojábana de queso y mazorca.',
+    description: 'Almojábana tradicional de queso y cuajada.',
     price: 1400,
     emoji: '🫓',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/almojabanas.webp',
+    imageUrl: 'https://stpandelacasa.blob.core.windows.net/catalogo-img/almojabanas.jpg',
     category: 'panes',
     active: true,
   },
   {
-    id: 'quesito',
-    name: 'Quesito',
-    description: 'Quesito de guayaba y queso.',
-    price: 1500,
-    emoji: '🧀',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/quesito.webp',
-    category: 'rebanadas',
-    active: true,
-  },
-  {
-    id: 'perrete',
-    name: 'Perrete',
-    description: 'Perrete dulce con maní.',
-    price: 900,
-    emoji: '🍩',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/perrete.webp',
-    category: 'dulces',
-    active: true,
-  },
-  {
-    id: 'magdalena',
-    name: 'Magdalena',
-    description: 'Magdalena esponjosa con glaseado.',
-    price: 1600,
-    emoji: '🍰',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/magdalena.webp',
-    category: 'rebanadas',
-    active: true,
-  },
-  {
-    id: 'pan-de-maiz',
-    name: 'Pan de Maíz',
-    description: 'Pan de maíz dulce.',
-    price: 1300,
-    emoji: '🌽',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/pan-de-maiz.webp',
-    category: 'panes',
-    active: true,
-  },
-  {
-    id: 'empanadas-pollo',
-    name: 'Empanadas de Pollo',
-    description: 'Empanadas de masa quebrada rellenas de pollo.',
-    price: 2500,
-    emoji: '🥟',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/empanadas-pollo.webp',
-    category: 'empanadas',
-    active: true,
-  },
-  {
-    id: 'empanadas-carne',
-    name: 'Empanadas de Carne',
-    description: 'Empanadas de masa quebrada rellenas de carne.',
-    price: 2500,
-    emoji: '🥟',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/empanadas-carne.webp',
-    category: 'empanadas',
-    active: true,
-  },
-  {
-    id: 'torta-queque',
-    name: 'Torta de Queque',
-    description: 'Torta de queque con pasión.',
-    price: 1800,
-    emoji: '🍰',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/torta-queque.webp',
-    category: 'rebanadas',
-    active: true,
-  },
-  {
-    id: 'pan-de-higos',
-    name: 'Pan de Higos',
-    description: 'Pan dulce de higos.',
+    id: 'galletas-de-chispa',
+    name: 'Galletas de Chispa',
+    description: 'Galletas caseras con chispa de vainilla y chocolate.',
     price: 1200,
-    emoji: '🍇',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/pan-de-higos.webp',
-    category: 'panes',
-    active: true,
-  },
-  {
-    id: 'suspiro',
-    name: 'Suspiro Santafereño',
-    description: 'Suspiro típico con manzana.',
-    price: 1500,
-    emoji: '🍏',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/suspiro.webp',
+    emoji: '🍪',
+    imageUrl: 'https://stpandelacasa.blob.core.windows.net/catalogo-img/galletas_de_chispa.jpg',
     category: 'dulces',
-    active: true,
-  },
-  {
-    id: 'torta-rico',
-    name: 'Torta Rica',
-    description: 'Torta ricada con frutas.',
-    price: 2200,
-    emoji: '🍰',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/torta-rico.webp',
-    category: 'rebanadas',
-    active: true,
-  },
-  {
-    id: 'pandebono',
-    name: 'Pandebono',
-    description: 'Pandebono de queso y huevo.',
-    price: 1100,
-    emoji: '🫓',
-    imageUrl: 'https://panaderia.blob.core.windows.net/catalogo/pandebono.webp',
-    category: 'panes',
     active: true,
   },
 ];
 
+let memoryProducts = [...initialProducts];
+
+// Funciones síncronas (compatibilidad con tests unitarios)
 const findProduct = (id) =>
-  products.find((product) => product.id === id && product.active);
+    memoryProducts.find((product) => product.id === id && product.active);
 
-const getProducts = () => products.filter((product) => product.active);
+const getProducts = () => memoryProducts.filter((product) => product.active);
 
-module.exports = { products, getProducts, findProduct };
+// Funciones asíncronas con MongoDB Atlas
+async function fetchProducts() {
+  const db = await getDb();
+  if (!db) return getProducts();
+
+  const col = db.collection('productos');
+  const count = await col.countDocuments();
+  if (count === 0) {
+    await col.insertMany(initialProducts);
+  }
+  const list = await col.find({ active: true }).project({ _id: 0 }).toArray();
+  memoryProducts = list;
+  return list;
+}
+
+async function addProduct({ name, description, price, category, imageUrl, emoji }) {
+  if (!name || !price || Number(price) <= 0) {
+    return { error: 'Nombre y precio mayor a 0 son obligatorios.' };
+  }
+
+  const slug = String(name)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+  const newProd = {
+    id: `${slug}-${Date.now().toString(36).slice(-4)}`,
+    name: String(name).trim(),
+    description: String(description || 'Producto artesanal recién horneado.').trim(),
+    price: Number(price),
+    emoji: emoji || '🥖',
+    imageUrl: imageUrl || 'https://stpandelacasa2026.blob.core.windows.net/catalogo-img/default.webp',
+    category: String(category || 'panes').toLowerCase(),
+    active: true,
+  };
+
+  const db = await getDb();
+  if (db) {
+    await db.collection('productos').insertOne({ ...newProd });
+  }
+  memoryProducts.push(newProd);
+  return { product: newProd };
+}
+
+async function deleteProduct(id) {
+  const db = await getDb();
+  if (db) {
+    const res = await db.collection('productos').updateOne(
+        { id },
+        { $set: { active: false } }
+    );
+    if (res.matchedCount === 0) return { error: 'Producto no encontrado.' };
+  } else {
+    const prod = memoryProducts.find((p) => p.id === id);
+    if (!prod) return { error: 'Producto no encontrado.' };
+    prod.active = false;
+  }
+  memoryProducts = memoryProducts.filter((p) => p.id !== id);
+  return { deleted: true, id };
+}
+
+module.exports = {
+  products: memoryProducts,
+  getProducts,
+  findProduct,
+  fetchProducts,
+  addProduct,
+  deleteProduct,
+};

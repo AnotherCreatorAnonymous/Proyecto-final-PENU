@@ -1,34 +1,12 @@
-const fs = require('fs');
-const path = require('path');
-const { findProduct, getProducts } = require('./products');
+const { findProduct, fetchProducts } = require('./products');
+const { getDb } = require('./db');
 
 const ORDER_STATUSES = ['PENDIENTE', 'PREPARANDO', 'LISTO', 'ENTREGADO'];
 
 const OPERATING_START_HOUR = 6; // 06:00
 const OPERATING_END_HOUR = 22; // 22:00
 
-const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'orders.json');
-
-const loadOrders = () => {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    return [];
-  }
-};
-
-const saveOrders = (list) => {
-  try {
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2));
-  } catch (err) {
-    // En runtime serverless sin FS persistente, el estado volumetra en memoria.
-  }
-};
-
-let orders = loadOrders();
+let orders = [];
 let sequence = 1000;
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -43,9 +21,9 @@ const parseDateKey = (dateKey) => {
   if (!y || !m || !d) return null;
   const date = new Date(y, (m || 1) - 1, d || 1);
   if (
-    date.getFullYear() !== y ||
-    date.getMonth() !== (m || 1) - 1 ||
-    date.getDate() !== (d || 1)
+      date.getFullYear() !== y ||
+      date.getMonth() !== (m || 1) - 1 ||
+      date.getDate() !== (d || 1)
   ) {
     return null;
   }
@@ -96,8 +74,7 @@ const calculateTotal = (items) => {
     const qty = Number(item && item.qty) || 0;
     return acc + (product ? product.price * qty : 0);
   }, 0);
-  const deliveryFee = 0; // Recogida en tienda, sin delivery.
-  return { subtotal, deliveryFee, total: subtotal };
+  return { subtotal, deliveryFee: 0, total: subtotal };
 };
 
 const createOrder = ({ items, customer, pickupDate, pickupTime, now = new Date() }) => {
@@ -141,9 +118,47 @@ const createOrder = ({ items, customer, pickupDate, pickupTime, now = new Date()
   };
   sequence += 1;
   orders.push(order);
-  saveOrders(orders);
   return { order };
 };
+
+// Persistencia asíncrona en MongoDB Atlas
+async function createOrderAsync(payload) {
+  await fetchProducts(); // Sincroniza catálogo activo desde Atlas antes de validar
+  const result = createOrder(payload);
+  if (result.error) return result;
+
+  const db = await getDb();
+  if (db) {
+    await db.collection('pedidos').insertOne({ ...result.order });
+  }
+  return result;
+}
+
+async function fetchOrders() {
+  const db = await getDb();
+  if (!db) return orders;
+  return db.collection('pedidos').find({}).project({ _id: 0 }).sort({ createdAt: -1 }).toArray();
+}
+
+async function updateOrderStatus(id, status) {
+  if (!ORDER_STATUSES.includes(status)) {
+    return { error: `Estado invalido. Permitidos: ${ORDER_STATUSES.join(', ')}` };
+  }
+  const db = await getDb();
+  if (db) {
+    const res = await db.collection('pedidos').findOneAndUpdate(
+        { id },
+        { $set: { status } },
+        { returnDocument: 'after', projection: { _id: 0 } }
+    );
+    if (!res) return { error: 'Pedido no encontrado.' };
+    return { order: res };
+  }
+  const order = orders.find((o) => o.id === id);
+  if (!order) return { error: 'Pedido no encontrado.' };
+  order.status = status;
+  return { order };
+}
 
 const getOrders = () => orders;
 
@@ -153,5 +168,8 @@ module.exports = {
   isValidPickupSlot,
   calculateTotal,
   createOrder,
+  createOrderAsync,
   getOrders,
+  fetchOrders,
+  updateOrderStatus,
 };
