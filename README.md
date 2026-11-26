@@ -1,6 +1,5 @@
 # Requisitos y Supuestos del Sistema — Panadería Pan de la Casa
 
-*Documento consolidado a partir de `docs/hld/Informe-proyecto.md` (Sección 2: Requisitos funcionales, no funcionalos y supuestos).*
 
 ## 2. Requisitos funcionales, no funcionales y supuestos
 
