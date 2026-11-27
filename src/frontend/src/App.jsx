@@ -579,7 +579,11 @@ export default function App() {
                   <td>{p.description}</td>
                   <td>{money(p.price)}</td>
                   <td>
-                    <button className="btn secondary" onClick={() => handleDeleteProduct(p)}>
+                    <button
+                        className="btn"
+                        style={{ backgroundColor: '#b91c1c', color: '#ffffff', padding: '6px 12px' }}
+                        onClick={() => handleDeleteProduct(p)}
+                    >
                       Eliminar
                     </button>
                   </td>
